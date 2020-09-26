@@ -43,6 +43,9 @@ class AlgoStrategy(gamelib.AlgoCore):
         SP = 0
         # This is a good place to do initial setup
         self.scored_on_locations = []
+        self.wall_count = 0
+        self.turret_count = 0
+        self.factory_count = 0
 
     def on_turn(self, turn_state):
         """
@@ -81,33 +84,41 @@ class AlgoStrategy(gamelib.AlgoCore):
             if game_state.get_resource(MP) > 10:
                 if random.randint(0, 2) == 1:
                     while game_state.get_resource(MP) >= game_state.type_cost(SCOUT)[MP]:
-                        game_state.attempt_spawn(SCOUT, [12, 1])
+                        game_state.attempt_spawn(SCOUT, [9, 4])
                 else:
                     while game_state.get_resource(MP) >= game_state.type_cost(SCOUT)[MP]:
-                        game_state.attempt_spawn(SCOUT, [15, 1])
+                        game_state.attempt_spawn(SCOUT, [18, 4])
 
 
     def build_structs(self, game_state):
-        factory_locations_initial = [[13,0], [14,0], [12,1], [13,1], [14,1]]
-        factory_locations_1 = [[15,1], [13, 2], [14, 2]]
+        factory_initial_locations = [[13,0], [14,0], [12,1], [13,1], [14,1], [15,1], [13, 2], [14, 2]]
 
-        wall_locations = [[0, 13], [1, 13], [2, 13], [3, 12], [4, 11], [5, 10], 
-                        [27, 13], [26, 13], [25, 13], [24, 12], [23, 11], [22, 10],
-                        [6, 9], [7, 8], [21, 9], [20, 8], [8, 7], [9, 6], [19, 7], [18, 6], [10, 5], [17, 5]]
+        # V-shape wall setup
+        v_horizontal_wall_locations = [[0, 13], [27, 13], [1, 13], [26, 13], [2, 13], [25, 13]]
+        v_left_wall_locations = [[3, 12], [4, 11], [5, 10], [6, 9], [7, 8], [8, 7], [9, 6], [10, 5]]
+        v_right_wall_locations = [[24, 12], [23, 11], [22, 10], [21, 9], [20, 8], [19, 7], [18, 6], [17, 5]]
+        v_wall_locations = [[0, 13], [27, 13], [1, 13], [26, 13], [2, 13], [25, 13], [3, 12], [24, 12], [4, 11], [23, 11], 
+                        [5, 10], [22, 10], [6, 9], [21, 9], [7, 8], [20, 8], [8, 7], [19, 7], [9, 6], [18, 6], [10, 5], [17, 5]]
 
-        turret_locations = [[11, 5], [16, 5], [13, 5], [14, 5]]
-        if game_state.turn_number == 0:
-            game_state.attempt_spawn(FACTORY, factory_locations_initial)
-        elif game_state.turn_number == 1:
-            game_state.attempt_spawn(FACTORY, factory_locations_1)
+        # V-shape turrent setup
+        v_central_turret_locations = [[13, 5], [14, 5]]
+        v_left_turret_locations = [[4, 10], [7, 7], [9, 5], [2, 12], [5, 9], [8, 6], [3, 11], [6, 8]]
+        v_right_turret_locations = [[23, 10], [20, 7], [18, 5], [25, 12], [22, 9], [19, 6], [24, 11], [21, 8]]
+        v_turret_locations = [[13, 5], [14, 5], [4, 10], [23, 10], [7, 7], [20, 7], [9, 5], [18, 5], [2, 12], [25, 12],
+                            [5, 9], [22, 9], [8, 6], [19, 6], [3, 11], [24, 11], [6, 8], [21, 8]]
+
+        if game_state.turn_number < 2:
+            game_state.attempt_spawn(FACTORY, factory_initial_locations)
         else:
-            game_state.attempt_spawn(WALL, wall_locations)
-            game_state.attempt_spawn(TURRET, turret_locations)
+            game_state.attempt_spawn(WALL, v_wall_locations)
+            game_state.attempt_spawn(TURRET, v_turret_locations)
             self.build_more_factories(game_state)
+
 
     def build_more_factories(self, game_state):
         factory_locations_extra = [[11, 2], [12, 2], [15, 2], [16, 2], [10, 3], [11, 3], [12, 3], [14, 3], [15, 3], [16, 3], [17, 3]]
         game_state.attempt_spawn(FACTORY, factory_locations_extra)
+
 
     def stall_with_interceptors(self, game_state):
         """
