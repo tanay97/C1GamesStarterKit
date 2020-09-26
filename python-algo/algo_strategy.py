@@ -56,7 +56,7 @@ class AlgoStrategy(gamelib.AlgoCore):
         gamelib.debug_write('Performing turn {} of your custom algo strategy'.format(game_state.turn_number))
         game_state.suppress_warnings(True)  #Comment or remove this line to enable warnings.
 
-        self.starter_strategy(game_state)
+        self.tanay_strategy(game_state)
 
         game_state.submit_turn()
 
@@ -65,6 +65,69 @@ class AlgoStrategy(gamelib.AlgoCore):
     NOTE: All the methods after this point are part of the sample starter-algo
     strategy and can safely be replaced for your custom algo.
     """
+
+    def tanay_strategy(self, game_state):
+        self.build_structs(game_state)
+        #if game_state.turn_number < 3:
+        self.initial_attack_strat(game_state)
+        #else:
+        #self.attack_strat(game_state)
+
+
+    def initial_attack_strat(self, game_state):
+        if game_state.turn_number < 3:
+            self.stall_with_interceptors(game_state)
+        else:
+            if game_state.get_resource(MP) > 10:
+                if random.randint(0, 2) == 1:
+                    while game_state.get_resource(MP) >= game_state.type_cost(SCOUT)[MP]:
+                        game_state.attempt_spawn(SCOUT, [12, 1])
+                else:
+                    while game_state.get_resource(MP) >= game_state.type_cost(SCOUT)[MP]:
+                        game_state.attempt_spawn(SCOUT, [15, 1])
+
+
+    def build_structs(self, game_state):
+        factory_locations_initial = [[13,0], [14,0], [12,1], [13,1], [14,1]]
+        factory_locations_1 = [[15,1], [13, 2], [14, 2]]
+
+        wall_locations = [[0, 13], [1, 13], [2, 13], [3, 12], [4, 11], [5, 10], 
+                        [27, 13], [26, 13], [25, 13], [24, 12], [23, 11], [22, 10],
+                        [6, 9], [7, 8], [21, 9], [20, 8], [8, 7], [9, 6], [19, 7], [18, 6], [10, 5], [17, 5]]
+
+        turret_locations = [[11, 5], [16, 5], [13, 5], [14, 5]]
+        if game_state.turn_number == 0:
+            game_state.attempt_spawn(FACTORY, factory_locations_initial)
+        elif game_state.turn_number == 1:
+            game_state.attempt_spawn(FACTORY, factory_locations_1)
+        else:
+            game_state.attempt_spawn(WALL, wall_locations)
+            game_state.attempt_spawn(TURRET, turret_locations)
+            self.build_more_factories(game_state)
+
+    def build_more_factories(self, game_state):
+        factory_locations_extra = [[11, 2], [12, 2], [15, 2], [16, 2], [10, 3], [11, 3], [12, 3], [14, 3], [15, 3], [16, 3], [17, 3]]
+        game_state.attempt_spawn(FACTORY, factory_locations_extra)
+
+    def stall_with_interceptors(self, game_state):
+        """
+        Send out interceptors at random locations to defend our base from enemy moving units.
+        """        
+        # Remove locations that are blocked by our own structures 
+        # since we can't deploy units there.
+        deploy_locations = [[9, 4], [18, 4]]
+        
+        # While we have remaining MP to spend lets send out interceptors randomly.
+        while game_state.get_resource(MP) >= game_state.type_cost(INTERCEPTOR)[MP] and len(deploy_locations) > 0:
+            # Choose a random deploy location.
+            deploy_index = random.randint(0, len(deploy_locations) - 1)
+            deploy_location = deploy_locations[deploy_index]
+            
+            game_state.attempt_spawn(INTERCEPTOR, deploy_location)
+            """
+            We don't have to remove the location since multiple mobile 
+            units can occupy the same space.py the same space.
+            """
 
     def starter_strategy(self, game_state):
         """
@@ -102,22 +165,7 @@ class AlgoStrategy(gamelib.AlgoCore):
                 game_state.attempt_spawn(FACTORY, factory_locations)
 
     def build_defences(self, game_state):
-        """
-        Build basic defenses using hardcoded locations.
-        Remember to defend corners and avoid placing units in the front where enemy demolishers can attack them.
-        """
-        # Useful tool for setting up your base locations: https://www.kevinbai.design/terminal-map-maker
-        # More community tools available at: https://terminal.c1games.com/rules#Download
 
-        # Place turrets that attack enemy units
-        turret_locations = [[0, 13], [27, 13], [8, 11], [19, 11], [13, 11], [14, 11]]
-        # attempt_spawn will try to spawn units if we have resources, and will check if a blocking unit is already there
-        game_state.attempt_spawn(TURRET, turret_locations)
-        
-        # Place walls in front of turrets to soak up damage for them
-        wall_locations = [[8, 12], [19, 12]]
-        game_state.attempt_spawn(WALL, wall_locations)
-        # upgrade walls so they soak more damage
         game_state.attempt_upgrade(wall_locations)
 
     def build_reactive_defense(self, game_state):
@@ -130,29 +178,6 @@ class AlgoStrategy(gamelib.AlgoCore):
             # Build turret one space above so that it doesn't block our own edge spawn locations
             build_location = [location[0], location[1]+1]
             game_state.attempt_spawn(TURRET, build_location)
-
-    def stall_with_interceptors(self, game_state):
-        """
-        Send out interceptors at random locations to defend our base from enemy moving units.
-        """
-        # We can spawn moving units on our edges so a list of all our edge locations
-        friendly_edges = game_state.game_map.get_edge_locations(game_state.game_map.BOTTOM_LEFT) + game_state.game_map.get_edge_locations(game_state.game_map.BOTTOM_RIGHT)
-        
-        # Remove locations that are blocked by our own structures 
-        # since we can't deploy units there.
-        deploy_locations = self.filter_blocked_locations(friendly_edges, game_state)
-        
-        # While we have remaining MP to spend lets send out interceptors randomly.
-        while game_state.get_resource(MP) >= game_state.type_cost(INTERCEPTOR)[MP] and len(deploy_locations) > 0:
-            # Choose a random deploy location.
-            deploy_index = random.randint(0, len(deploy_locations) - 1)
-            deploy_location = deploy_locations[deploy_index]
-            
-            game_state.attempt_spawn(INTERCEPTOR, deploy_location)
-            """
-            We don't have to remove the location since multiple mobile 
-            units can occupy the same space.
-            """
 
     def demolisher_line_strategy(self, game_state):
         """
