@@ -43,11 +43,14 @@ class AlgoStrategy(gamelib.AlgoCore):
         SP = 0
         # This is a good place to do initial setup
         self.scored_on_locations = {}
-        self.wall_count = 0
-        self.turret_count = 0
-        self.factory_count = 0
+        self.enemy_unit_movement = []
+        self.frame_count = 0
+
+        self.recurring_line_crossing = {}
+
         self.build_queue = []
-        self.build_initial_queue()
+        self.upgrade_queue = []
+        self.initialize_queues()
 
     def on_turn(self, turn_state):
         """
@@ -59,124 +62,62 @@ class AlgoStrategy(gamelib.AlgoCore):
         """
         game_state = gamelib.GameState(self.config, turn_state)
         gamelib.debug_write('Performing turn {} of your custom algo strategy'.format(game_state.turn_number))
+
+        for instance in self.enemy_unit_movement:
+            if (instance[0], instance[1][0][0]) not in self.recurring_line_crossing:
+                self.recurring_line_crossing[(instance[0], instance[1][0][0])] = 1
+            else:
+                self.recurring_line_crossing[(instance[0], instance[1][0][0])] += 1
+
+        self.recurring_line_crossing = {k: v for k, v in sorted(self.recurring_line_crossing.items(), key=lambda item: item[1])}
+
+        gamelib.debug_write(self.recurring_line_crossing)
+
         game_state.suppress_warnings(True)  #Comment or remove this line to enable warnings.
 
-        self.tanay_strategy(game_state)
+        self.starter_strategy(game_state)
 
         game_state.submit_turn()
+
+        self.frame_count = 0
+        self.enemy_unit_movement = []
 
 
     """
     NOTE: All the methods after this point are part of the sample starter-algo
     strategy and can safely be replaced for your custom algo.
     """
-
-    def tanay_strategy(self, game_state):
-        # self.adjust_queue(game_state)
-        self.build_structs(game_state)
-        #if game_state.turn_number < 3:
-        self.initial_attack_strat(game_state)
-        #else:
-        #self.attack_strat(game_state)
-
-    def build_initial_queue(self):
-        self.factory_initial_locations = { "type": FACTORY, 
-                                      "loc": [[13,0], [14,0], [12,1], [13,1], [14,1], [15,1], [13, 2], [14, 2]]
-                                      }
-        self.factory_next_locations = { "type": FACTORY, 
-                                      "loc": [[15,1], [13, 2], [14, 2]]
-                                      }
-        # V-shape wall setup
-        self.v_horizontal_wall_locations = { "type": WALL,
-                                        "loc": [[0, 13], [27, 13], [1, 13], [26, 13], [2, 13], [25, 13]]
+    def initialize_queues(self):
+        self.factory_base_locations = { "type": FACTORY, 
+                                        "loc": [[11, 7], [12, 7], [13, 7], [14, 7]]
                                         }
-        self.v_left_wall_locations = { "type": WALL,
-                                  "loc": [[3, 12], [4, 11], [5, 10], [6, 9], [7, 8], [8, 7], [9, 6], [10, 5]]
-                                  }
-        self.v_right_wall_locations = { "type": WALL,
-                                   "loc": [[24, 12], [23, 11], [22, 10], [21, 9], [20, 8], [19, 7], [18, 6], [17, 5]]
-                                   }
-
-        # V-shape turrent setup
-        self.v_central_turret_locations = { "type": TURRET,
-                                            "loc": [[13, 5], [14, 5]]
-                                            }
-        self.v_left_turret_locations = { "type": TURRET,
-                                    "loc": [[4, 10], [7, 7], [9, 5], [2, 12], [5, 9], [8, 6], [3, 11], [6, 8]]
-                                    }
-        self.v_right_turret_locations = { "type": TURRET,
-                                     "loc": [[23, 10], [20, 7], [18, 5], [25, 12], [22, 9], [19, 6], [24, 11], [21, 8]]
-                                     }
-        self.build_queue = [self.factory_initial_locations, self.factory_next_locations, self.v_horizontal_wall_locations,
-                                self.v_left_turret_locations, self.v_right_turret_locations, self.v_left_wall_locations,
-                                self.v_right_wall_locations]
-
-    def initial_attack_strat(self, game_state):
-        if game_state.turn_number < 3:
-            self.stall_with_interceptors(game_state)
-        else:
-            if game_state.get_resource(MP) > 10:
-                if random.randint(0, 2) == 1:
-                    while game_state.get_resource(MP) >= game_state.type_cost(SCOUT)[MP]:
-                        game_state.attempt_spawn(SCOUT, [9, 4])
-                else:
-                    while game_state.get_resource(MP) >= game_state.type_cost(SCOUT)[MP]:
-                        game_state.attempt_spawn(SCOUT, [18, 4])
-
-    def adjust_queue(self, game_state):
-        if self.scored_on_locations:
-          damage_location = max(self.scored_on_locations, key=self.scored_on_locations.get)
-
-
-    def build_structs(self, game_state):
-        factory_initial_locations = [[13,0], [14,0], [12,1], [13,1], [14,1], [15,1], [13, 2], [14, 2]]
-
+        self.factory_extra_locations = { "type": FACTORY,
+                                        "loc": [[15, 7], [16, 7], [12, 6], [13, 6], [14, 6], [15, 6], [13, 5], [14, 5]]
+                                         }
         # V-shape wall setup
-        v_horizontal_wall_locations = [[0, 13], [27, 13], [1, 13], [26, 13], [2, 13], [25, 13]]
-        v_left_wall_locations = [[3, 12], [4, 11], [5, 10], [6, 9], [7, 8], [8, 7], [9, 6], [10, 5]]
-        v_right_wall_locations = [[24, 12], [23, 11], [22, 10], [21, 9], [20, 8], [19, 7], [18, 6], [17, 5]]
-        v_wall_locations = [[0, 13], [27, 13], [1, 13], [26, 13], [2, 13], [25, 13], [3, 12], [24, 12], [4, 11], [23, 11], 
-                        [5, 10], [22, 10], [6, 9], [21, 9], [7, 8], [20, 8], [8, 7], [19, 7], [9, 6], [18, 6], [10, 5], [17, 5]]
-
+        self.wall_left_location = { "type": WALL,
+                                    "loc": [[0,13], [1, 13], [2, 13], [3, 13]]
+                                    }
+        self.wall_right_location = { "type": WALL,
+                                    "loc": [[24,13], [25, 13], [26, 13], [27, 13]]
+                                    }
+        self.wall_base_location = { "type": WALL,
+                                   "loc": [[4, 12], [23, 12], [5, 11], [22, 11], [6, 10], [21, 10], [7, 9], 
+                                   [20, 9], [8, 8], [9, 8], [10, 8], [11, 8], [12, 8], [13, 8], [14, 8], 
+                                   [15, 8], [16, 8], [17, 8], [18, 8], [19, 8]]
+                                   }
         # V-shape turrent setup
-        v_central_turret_locations = [[13, 5], [14, 5]]
-        v_left_turret_locations = [[4, 10], [7, 7], [9, 5], [2, 12], [5, 9], [8, 6], [3, 11], [6, 8]]
-        v_right_turret_locations = [[23, 10], [20, 7], [18, 5], [25, 12], [22, 9], [19, 6], [24, 11], [21, 8]]
-        v_turret_locations = [[13, 5], [14, 5], [4, 10], [23, 10], [7, 7], [20, 7], [9, 5], [18, 5], [2, 12], [25, 12],
-                            [5, 9], [22, 9], [8, 6], [19, 6], [3, 11], [24, 11], [6, 8], [21, 8]]
-
-        if game_state.turn_number < 2:
-            game_state.attempt_spawn(FACTORY, factory_initial_locations)
-        else:
-            game_state.attempt_spawn(WALL, v_wall_locations)
-            game_state.attempt_spawn(TURRET, v_turret_locations)
-            self.build_more_factories(game_state)
-
-
-    def build_more_factories(self, game_state):
-        factory_locations_extra = [[11, 2], [12, 2], [15, 2], [16, 2], [10, 3], [11, 3], [12, 3], [14, 3], [15, 3], [16, 3], [17, 3]]
-        game_state.attempt_spawn(FACTORY, factory_locations_extra)
-
-
-    def stall_with_interceptors(self, game_state):
-        """
-        Send out interceptors at random locations to defend our base from enemy moving units.
-        """        
-        # Remove locations that are blocked by our own structures 
-        # since we can't deploy units there.
-        deploy_locations = [[9, 4], [18, 4], [0, 13], [27, 13]]
-        
-        # While we have remaining MP to spend lets send out interceptors randomly.
-        while game_state.get_resource(MP) >= game_state.type_cost(INTERCEPTOR)[MP] and len(deploy_locations) > 0:
-            # Choose a random deploy location.
-            deploy_index = random.randint(0, len(deploy_locations) - 1)
-            deploy_location = deploy_locations[deploy_index]
-            
-            game_state.attempt_spawn(INTERCEPTOR, deploy_location)
-            """
-            We don't have to remove the location since multiple mobile 
-            units can occupy the same space.py the same space.
-            """
+        self.turret_base_locations = { "type": TURRET,
+                                    "loc": [[3, 12], [24, 12]]
+                                    }
+        self.turret_right_locations = { "type": TURRET,
+                                    "loc": [[24, 12], [23, 11], [22, 12], [22, 10]]
+                                    }
+        self.turret_left_locations = { "type": TURRET,
+                                    "loc": [[3, 12], [4, 11], [5, 12], [5, 10]]
+                                    }
+        self.base_build = [self.wall_left_location, self.wall_base_location, self.turret_base_locations, self.factory_base_locations]
+        self.build_queue = []
 
     def starter_strategy(self, game_state):
         """
@@ -185,48 +126,98 @@ class AlgoStrategy(gamelib.AlgoCore):
         For offense we will use long range demolishers if they place stationary units near the enemy's front.
         If there are no stationary units to attack in the front, we will send Scouts to try and score quickly.
         """
-        # First, place basic defenses
+
         self.build_defences(game_state)
-        # Now build reactive defenses based on where the enemy scored
-        self.build_reactive_defense(game_state)
-
-        # If the turn is less than 5, stall with interceptors and wait to see enemy's base
-        if game_state.turn_number < 5:
-            self.stall_with_interceptors(game_state)
+        if game_state.turn_number < 3:
+            self.stall_with_interceptors(game_state, int(0.8*game_state.get_resource(MP)))
         else:
-            # Now let's analyze the enemy base to see where their defenses are concentrated.
-            # If they have many units in the front we can build a line for our demolishers to attack them at long range.
-            if self.detect_enemy_unit(game_state, unit_type=None, valid_x=None, valid_y=[14, 15]) > 10:
-                self.demolisher_line_strategy(game_state)
-            else:
-                # They don't have many units in the front so lets figure out their least defended area and send Scouts there.
-
-                # Only spawn Scouts every other turn
-                # Sending more at once is better since attacks can only hit a single scout at a time
-                if game_state.turn_number % 2 == 1:
-                    # To simplify we will just check sending them from back left and right
-                    scout_spawn_location_options = [[13, 0], [14, 0]]
-                    best_location = self.least_damage_spawn_location(game_state, scout_spawn_location_options)
-                    game_state.attempt_spawn(SCOUT, best_location, 1000)
-
-                # Lastly, if we have spare SP, let's build some Factories to generate more resources
-                factory_locations = [[13, 2], [14, 2], [13, 3], [14, 3]]
-                game_state.attempt_spawn(FACTORY, factory_locations)
+            self.stall_with_interceptors(game_state, int(0.5*game_state.get_resource(MP)))
+            self.scout_attack(game_state, int(0.5*game_state.get_resource(MP)))
 
     def build_defences(self, game_state):
-
-        game_state.attempt_upgrade(wall_locations)
-
-    def build_reactive_defense(self, game_state):
         """
-        This function builds reactive defenses based on where the enemy scored on us from.
-        We can track where the opponent scored by looking at events in action frames 
-        as shown in the on_action_frame function
+        Build basic defenses using hardcoded locations.
+        Remember to defend corners and avoid placing units in the front where enemy demolishers can attack them.
         """
-        for location in self.scored_on_locations.values():
-            # Build turret one space above so that it doesn't block our own edge spawn locations
-            build_location = [location[0], location[1]+1]
-            game_state.attempt_spawn(TURRET, build_location)
+        # Useful tool for setting up your base locations: https://www.kevinbai.design/terminal-map-maker
+        # More community tools available at: https://terminal.c1games.com/rules#Download
+        if game_state.turn_number == 3:
+            self.build_queue.append(self.factory_extra_locations)
+
+        for struct in self.base_build:
+            game_state.attempt_spawn(struct["type"], struct["loc"])
+
+        if self.scored_on_locations:
+            damage_location = max(self.scored_on_locations, key=self.scored_on_locations.get)
+            damage_side = "left" if damage_location[0] < 13 else "right"
+            if damage_location[0] < 13:
+                self.build_queue.clear()
+                self.build_queue.append(self.turret_left_locations)
+                self.build_queue.append(self.factory_extra_locations)
+            else:
+                self.build_queue.clear()
+                self.build_queue.append(self.turret_right_locations)
+                self.build_queue.append(self.factory_extra_locations)
+        else:
+            self.build_queue.clear()
+            self.build_queue.append(self.factory_extra_locations)
+
+        for struct in self.build_queue:
+            game_state.attempt_spawn(struct["type"], struct["loc"])
+            game_state.attempt_upgrade(struct["loc"])
+
+        game_state.attempt_upgrade(self.turret_base_locations["loc"])
+        game_state.attempt_upgrade(self.factory_base_locations["loc"])
+
+    def find_intercept_path(self, instance):
+        # 5,8: 29 spaces
+        # 6, 7: 27 spaces
+        # 14, 0: 24 spaces 12
+        # 15, 1: 22 spaces 11
+        # 16, 2: 20 spaces 10
+        # 17, 3: 18 spaces
+        # 18, 4: 16 spaces
+        # 19, 5: 14 spaces
+        # 20, 6: 12 spaces
+        # 21, 7: 10 spaces
+        # 22, 8: 8 spaces
+        # 23, 9: 6 spaces 
+        if instance[0] > 118:
+            return [5, 8]
+        elif instance[0] > 108:
+            return [6, 7]
+        elif instance[0] > 96:
+            return [14, 0]
+        else:
+            return [26 - int(instance[0]/8), 12 - int(instance[0]/8)]
+
+    def scout_attack(self, game_state, cost):
+        loc, damage = self.least_damage_spawn_location(game_state, [[13, 0], [13, 1], [11, 2], [12, 1], [26, 12]])
+        if damage/(game_state.number_affordable(SCOUT) * 15) < 0.5:
+            game_state.attempt_spawn(SCOUT, [loc], game_state.number_affordable(SCOUT))
+
+    def stall_with_interceptors(self, game_state, cost):
+        """
+        Send out interceptors at random locations to defend our base from enemy moving units.
+        """            
+
+        deploy_locations = [[2, 11], [25, 11], [4, 9], [23, 9], [6, 7], [21, 7], [8, 5], [19, 5], [10, 3], [17, 3], [12, 1], [15, 1]]
+        spent = 0
+
+        # While we have remaining MP to spend lets send out interceptors randomly.
+        while game_state.get_resource(MP) >= game_state.type_cost(INTERCEPTOR)[MP] and len(deploy_locations) > 0 and cost > spent:
+            if len(self.recurring_line_crossing.keys()) == 0:
+                gamelib.debug_write("Empty crossings list")
+                game_state.attempt_spawn(INTERCEPTOR, random.choice(deploy_locations))
+                spent += 1
+                continue
+            ins = random.choices(list(self.recurring_line_crossing.keys()), list(self.recurring_line_crossing.values()))
+            game_state.attempt_spawn(INTERCEPTOR, self.find_intercept_path(ins[0]))
+            spent += 1
+            """
+            We don't have to remove the location since multiple mobile 
+            units can occupy the same space.
+            """
 
     def demolisher_line_strategy(self, game_state):
         """
@@ -261,13 +252,16 @@ class AlgoStrategy(gamelib.AlgoCore):
         for location in location_options:
             path = game_state.find_path_to_edge(location)
             damage = 0
+            if path == None:
+                # gamelib.debug_write(str(location))
+                continue
             for path_location in path:
                 # Get number of enemy turrets that can attack each location and multiply by turret damage
                 damage += len(game_state.get_attackers(path_location, 0)) * gamelib.GameUnit(TURRET, game_state.config).damage_i
             damages.append(damage)
         
         # Now just return the location that takes the least damage
-        return location_options[damages.index(min(damages))]
+        return location_options[damages.index(min(damages))], min(damages)
 
     def detect_enemy_unit(self, game_state, unit_type=None, valid_x = None, valid_y = None):
         total_units = 0
@@ -294,6 +288,11 @@ class AlgoStrategy(gamelib.AlgoCore):
         """
         # Let's record at what position we get scored on
         state = json.loads(turn_string)
+        for movement in state["events"]["move"]:
+            if movement[5] == 2 and movement[0][1] == 14 and movement[0][0] > 20 and movement[0][0] < 28:
+                self.enemy_unit_movement.append([self.frame_count, movement])
+        self.frame_count += 1
+
         events = state["events"]
         breaches = events["breach"]
         for breach in breaches:
@@ -309,7 +308,6 @@ class AlgoStrategy(gamelib.AlgoCore):
                 else:
                     self.scored_on_locations[location_coordinates] = 1
                 gamelib.debug_write("All locations: {}".format(self.scored_on_locations))
-
 
 if __name__ == "__main__":
     algo = AlgoStrategy()
