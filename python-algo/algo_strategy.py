@@ -42,7 +42,7 @@ class AlgoStrategy(gamelib.AlgoCore):
         MP = 1
         SP = 0
         # This is a good place to do initial setup
-        self.scored_on_locations = []
+        self.scored_on_locations = {}
         self.wall_count = 0
         self.turret_count = 0
         self.factory_count = 0
@@ -107,10 +107,9 @@ class AlgoStrategy(gamelib.AlgoCore):
         self.v_right_turret_locations = { "type": TURRET,
                                      "loc": [[23, 10], [20, 7], [18, 5], [25, 12], [22, 9], [19, 6], [24, 11], [21, 8]]
                                      }
-        self.build_queue.append(self.factory_initial_locations, self.factory_next_locations, self.v_horizontal_wall_locations,
+        self.build_queue = [self.factory_initial_locations, self.factory_next_locations, self.v_horizontal_wall_locations,
                                 self.v_left_turret_locations, self.v_right_turret_locations, self.v_left_wall_locations,
-                                self.v_right_wall_locations
-                                )
+                                self.v_right_wall_locations]
 
     def initial_attack_strat(self, game_state):
         if game_state.turn_number < 3:
@@ -125,10 +124,8 @@ class AlgoStrategy(gamelib.AlgoCore):
                         game_state.attempt_spawn(SCOUT, [18, 4])
 
     def adjust_queue(self, game_state):
-        damage_location = self.get_most_damaged_location(game_state)
+        damage_location = max(self.scored_on_locations, key=self.scored_on_locations.get)
 
-    def get_most_damaged_location(self, game_state):
-        pass
 
     def build_structs(self, game_state):
         factory_initial_locations = [[13,0], [14,0], [12,1], [13,1], [14,1], [15,1], [13, 2], [14, 2]]
@@ -166,7 +163,7 @@ class AlgoStrategy(gamelib.AlgoCore):
         """        
         # Remove locations that are blocked by our own structures 
         # since we can't deploy units there.
-        deploy_locations = [[9, 4], [18, 4]]
+        deploy_locations = [[9, 4], [18, 4], [0, 13], [27, 13]]
         
         # While we have remaining MP to spend lets send out interceptors randomly.
         while game_state.get_resource(MP) >= game_state.type_cost(INTERCEPTOR)[MP] and len(deploy_locations) > 0:
@@ -225,7 +222,7 @@ class AlgoStrategy(gamelib.AlgoCore):
         We can track where the opponent scored by looking at events in action frames 
         as shown in the on_action_frame function
         """
-        for location in self.scored_on_locations:
+        for location in self.scored_on_locations.values():
             # Build turret one space above so that it doesn't block our own edge spawn locations
             build_location = [location[0], location[1]+1]
             game_state.attempt_spawn(TURRET, build_location)
@@ -305,7 +302,11 @@ class AlgoStrategy(gamelib.AlgoCore):
             # 1 is integer for yourself, 2 is opponent (StarterKit code uses 0, 1 as player_index instead)
             if not unit_owner_self:
                 gamelib.debug_write("Got scored on at: {}".format(location))
-                self.scored_on_locations.append(location)
+                location_coordinates = (location[0], location[1])
+                if location_coordinates in self.scored_on_locations:
+                    self.scored_on_locations[location_coordinates] += 1
+                else:
+                    self.scored_on_locations[location_coordinates] = 1
                 gamelib.debug_write("All locations: {}".format(self.scored_on_locations))
 
 
