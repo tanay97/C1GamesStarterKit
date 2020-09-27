@@ -124,7 +124,8 @@ class AlgoStrategy(gamelib.AlgoCore):
                         game_state.attempt_spawn(SCOUT, [18, 4])
 
     def adjust_queue(self, game_state):
-        damage_location = max(self.scored_on_locations, key=self.scored_on_locations.get)
+        if self.scored_on_locations:
+          damage_location = max(self.scored_on_locations, key=self.scored_on_locations.get)
 
 
     def build_structs(self, game_state):
