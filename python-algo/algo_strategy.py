@@ -46,6 +46,8 @@ class AlgoStrategy(gamelib.AlgoCore):
         self.wall_count = 0
         self.turret_count = 0
         self.factory_count = 0
+        self.build_queue = []
+        self.build_initial_queue()
 
     def on_turn(self, turn_state):
         """
@@ -70,12 +72,45 @@ class AlgoStrategy(gamelib.AlgoCore):
     """
 
     def tanay_strategy(self, game_state):
+        # self.adjust_queue(game_state)
         self.build_structs(game_state)
         #if game_state.turn_number < 3:
         self.initial_attack_strat(game_state)
         #else:
         #self.attack_strat(game_state)
 
+    def build_initial_queue(self):
+        self.factory_initial_locations = { "type": FACTORY, 
+                                      "loc": [[13,0], [14,0], [12,1], [13,1], [14,1], [15,1], [13, 2], [14, 2]]
+                                      }
+        self.factory_next_locations = { "type": FACTORY, 
+                                      "loc": [[15,1], [13, 2], [14, 2]]
+                                      }
+        # V-shape wall setup
+        self.v_horizontal_wall_locations = { "type": WALL,
+                                        "loc": [[0, 13], [27, 13], [1, 13], [26, 13], [2, 13], [25, 13]]
+                                        }
+        self.v_left_wall_locations = { "type": WALL,
+                                  "loc": [[3, 12], [4, 11], [5, 10], [6, 9], [7, 8], [8, 7], [9, 6], [10, 5]]
+                                  }
+        self.v_right_wall_locations = { "type": WALL,
+                                   "loc": [[24, 12], [23, 11], [22, 10], [21, 9], [20, 8], [19, 7], [18, 6], [17, 5]]
+                                   }
+
+        # V-shape turrent setup
+        self.v_central_turret_locations = { "type": TURRET,
+                                            "loc": [[13, 5], [14, 5]]
+                                            }
+        self.v_left_turret_locations = { "type": TURRET,
+                                    "loc": [[4, 10], [7, 7], [9, 5], [2, 12], [5, 9], [8, 6], [3, 11], [6, 8]]
+                                    }
+        self.v_right_turret_locations = { "type": TURRET,
+                                     "loc": [[23, 10], [20, 7], [18, 5], [25, 12], [22, 9], [19, 6], [24, 11], [21, 8]]
+                                     }
+        self.build_queue.append(self.factory_initial_locations, self.factory_next_locations, self.v_horizontal_wall_locations,
+                                self.v_left_turret_locations, self.v_right_turret_locations, self.v_left_wall_locations,
+                                self.v_right_wall_locations
+                                )
 
     def initial_attack_strat(self, game_state):
         if game_state.turn_number < 3:
@@ -89,6 +124,11 @@ class AlgoStrategy(gamelib.AlgoCore):
                     while game_state.get_resource(MP) >= game_state.type_cost(SCOUT)[MP]:
                         game_state.attempt_spawn(SCOUT, [18, 4])
 
+    def adjust_queue(self, game_state):
+        damage_location = self.get_most_damaged_location(game_state)
+
+    def get_most_damaged_location(self, game_state):
+        pass
 
     def build_structs(self, game_state):
         factory_initial_locations = [[13,0], [14,0], [12,1], [13,1], [14,1], [15,1], [13, 2], [14, 2]]
