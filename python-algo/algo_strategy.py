@@ -89,10 +89,10 @@ class AlgoStrategy(gamelib.AlgoCore):
     """
     def initialize_queues(self):
         self.factory_base_locations = { "type": FACTORY, 
-                                        "loc": [[11, 7], [12, 7], [13, 7], [14, 7]]
+                                        "loc": [[11, 7], [12, 7], [13, 7], [14, 7], [15, 7], [16, 7], [12, 6]]
                                         }
         self.factory_extra_locations = { "type": FACTORY,
-                                        "loc": [[15, 7], [16, 7], [12, 6], [13, 6], [14, 6], [15, 6], [13, 5], [14, 5]]
+                                        "loc": [[13, 6], [14, 6], [15, 6], [13, 5], [14, 5]]
                                          }
         # V-shape wall setup
         self.wall_left_location = { "type": WALL,
@@ -128,11 +128,30 @@ class AlgoStrategy(gamelib.AlgoCore):
         """
 
         self.build_defences(game_state)
+
+            # self.scout_attack(game_state, int(0.5*game_state.get_resource(MP)))
+    
+    def attack_strategy(self, game_state):
         if game_state.turn_number < 3:
-            self.stall_with_interceptors(game_state, int(0.8*game_state.get_resource(MP)))
+            interceptor_ratio = 0.8
+            demolisher_ratio = 0
+            scout_ratio = 0.2
+        elif game_state.turn_number < 10:
+            interceptor_ratio = 0.5
+            demolisher_ratio = 0.2
+            scout_ratio = 0.3
+        elif game_state.turn_number < 20:
+            interceptor_ratio = 0.3
+            demolisher_ratio = 0.5
+            scout_ratio = 0.2
         else:
-            self.stall_with_interceptors(game_state, int(0.5*game_state.get_resource(MP)))
-            self.scout_attack(game_state, int(0.5*game_state.get_resource(MP)))
+            interceptor_ratio = 0.1
+            demolisher_ratio = 0.7
+            scout_ratio = 0.2
+
+        self.stall_with_interceptors(game_state, int(interceptor_ratio*game_state.get_resource(MP)))
+        #self.demolisher_attack(game_state, int(demolisher_ratio*game_state.number_affordable(DEMOLISHER)))
+        self.scout_attack(game_state, int(scout_ratio*game_state.number_affordable(SCOUT)))
 
     def build_defences(self, game_state):
         """
@@ -191,10 +210,16 @@ class AlgoStrategy(gamelib.AlgoCore):
         else:
             return [26 - int(instance[0]/8), 12 - int(instance[0]/8)]
 
-    def scout_attack(self, game_state, cost):
+    def scout_attack(self, game_state, num):
         loc, damage = self.least_damage_spawn_location(game_state, [[13, 0], [13, 1], [11, 2], [12, 1], [26, 12]])
-        if damage/(game_state.number_affordable(SCOUT) * 15) < 0.5:
-            game_state.attempt_spawn(SCOUT, [loc], game_state.number_affordable(SCOUT))
+        if damage/(num * 15) < 0.5:
+            game_state.attempt_spawn(SCOUT, [loc], num)
+
+
+    def demolisher_attack(self, game_state, cost):
+        loc, damage = self.least_damage_spawn_location(game_state, [[26, 12]])
+        if self.damage_dealt(game_state, DEMOLISHER, 5, num) / damage > 3:
+            game_state.attempt_spawn(DEMOLISHER, [loc], cost/game_state.type_cost(DEMOLISHER))
 
     def stall_with_interceptors(self, game_state, cost):
         """
@@ -219,28 +244,6 @@ class AlgoStrategy(gamelib.AlgoCore):
             units can occupy the same space.
             """
 
-    def demolisher_line_strategy(self, game_state):
-        """
-        Build a line of the cheapest stationary unit so our demolisher can attack from long range.
-        """
-        # First let's figure out the cheapest unit
-        # We could just check the game rules, but this demonstrates how to use the GameUnit class
-        stationary_units = [WALL, TURRET, FACTORY]
-        cheapest_unit = WALL
-        for unit in stationary_units:
-            unit_class = gamelib.GameUnit(unit, game_state.config)
-            if unit_class.cost[game_state.MP] < gamelib.GameUnit(cheapest_unit, game_state.config).cost[game_state.MP]:
-                cheapest_unit = unit
-
-        # Now let's build out a line of stationary units. This will prevent our demolisher from running into the enemy base.
-        # Instead they will stay at the perfect distance to attack the front two rows of the enemy base.
-        for x in range(27, 5, -1):
-            game_state.attempt_spawn(cheapest_unit, [x, 11])
-
-        # Now spawn demolishers next to the line
-        # By asking attempt_spawn to spawn 1000 units, it will essentially spawn as many as we have resources for
-        game_state.attempt_spawn(DEMOLISHER, [24, 10], 1000)
-
     def least_damage_spawn_location(self, game_state, location_options):
         """
         This function will help us guess which location is the safest to spawn moving units from.
@@ -263,21 +266,8 @@ class AlgoStrategy(gamelib.AlgoCore):
         # Now just return the location that takes the least damage
         return location_options[damages.index(min(damages))], min(damages)
 
-    def detect_enemy_unit(self, game_state, unit_type=None, valid_x = None, valid_y = None):
-        total_units = 0
-        for location in game_state.game_map:
-            if game_state.contains_stationary_unit(location):
-                for unit in game_state.game_map[location]:
-                    if unit.player_index == 1 and (unit_type is None or unit.unit_type == unit_type) and (valid_x is None or location[0] in valid_x) and (valid_y is None or location[1] in valid_y):
-                        total_units += 1
-        return total_units
-        
-    def filter_blocked_locations(self, locations, game_state):
-        filtered = []
-        for location in locations:
-            if not game_state.contains_stationary_unit(location):
-                filtered.append(location)
-        return filtered
+    def damage_dealt(self, game_state, unit, health, num):
+        pass
 
     def on_action_frame(self, turn_string):
         """
