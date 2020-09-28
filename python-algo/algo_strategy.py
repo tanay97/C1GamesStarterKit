@@ -51,6 +51,7 @@ class AlgoStrategy(gamelib.AlgoCore):
         self.build_queue = []
         self.upgrade_queue = []
         self.initialize_queues()
+        self.last_strat = 0
 
     def on_turn(self, turn_state):
         """
@@ -120,6 +121,11 @@ class AlgoStrategy(gamelib.AlgoCore):
         self.turret_left_locations = { "type": TURRET,
                                     "loc": [[3, 12], [4, 11], [5, 12], [5, 10]]
                                     }
+        self.late_game_turrets = {"type": TURRET,
+                                "loc": [[6, 11], [21, 11], [7, 11], [20, 11], [8, 11], [19, 11], [9, 11], 
+                                [18, 11], [10, 11], [17, 11], [11, 11], [16, 11], [12, 11], [15, 11], 
+                                [13, 11], [14, 11], [4, 11], [23, 11], [5, 10], [22, 10], [6, 9], [21, 9], [7, 8], [20, 8], [8, 7], [19, 7]]
+                                }
         self.base_build = [self.factory_base_locations]
         self.build_queue = []
 
@@ -132,9 +138,25 @@ class AlgoStrategy(gamelib.AlgoCore):
         """
 
         self.build_defences(game_state)
+        #self.attack_strategy(game_state)
         self.attack_strategy(game_state)
 
             # self.scout_attack(game_state, int(0.5*game_state.get_resource(MP)))
+    def ikes_strategy(self, game_state):
+        if game_state.turn_number < 3:
+            self.stall_with_interceptors(game_state, int(0.8*game_state.get_resource(MP)))
+        else:
+            defense_stat =  len(game_state.get_attackers([25, 13], 0)) + len(game_state.get_attackers([25, 13], 0)) + len(game_state.get_attackers([26, 13], 0)) + len(game_state.get_attackers([27, 13], 0))
+            if defense_stat == 0:
+                game_state.attempt_spawn(SCOUT, [14, 0])  
+            else:
+                if self.last_strat != 2:
+                    self.stall_with_interceptors(game_state, int(0.5*game_state.get_resource(MP, 1)))
+                    self.last_strat += 1
+                else:
+                    self.stall_with_interceptors(game_state, int(0.3*game_state.get_resource(MP, 1)))
+                    game_state.attempt_spawn(DEMOLISHER, [14, 0])   
+                    self.last_strat = 0 
     
     def attack_strategy(self, game_state):
         if game_state.turn_number < 10:
@@ -152,8 +174,9 @@ class AlgoStrategy(gamelib.AlgoCore):
             self.stall_with_interceptors(game_state, int(interceptor_ratio*game_state.get_resource(MP)))
             # self.demolisher_attack(game_state, int(demolisher_ratio*game_state.number_affordable(DEMOLISHER)))
             self.scout_attack(game_state, int(scout_ratio*game_state.number_affordable(SCOUT)))
-        if game_state.turn_number > 20:
-            game_state.attempt_spawn(DEMOLISHER, [16, 2], game_state.number_affordable(DEMOLISHER))
+        num_demolisher = int(game_state.get_resource(MP) / game_state.type_cost(DEMOLISHER)[MP])
+        # if num_demolisher > 6:
+        #    game_state.attempt_spawn(DEMOLISHER, [16, 2], game_state.number_affordable(DEMOLISHER))
 
     def build_defences(self, game_state):
         """
@@ -179,7 +202,7 @@ class AlgoStrategy(gamelib.AlgoCore):
         for struct in self.base_build:
             game_state.attempt_spawn(struct["type"], struct["loc"])
 
-        if self.scored_on_locations and game_state.turn_number > 10:
+        if self.scored_on_locations and game_state.turn_number > 5:
             damage_location = max(self.scored_on_locations, key=self.scored_on_locations.get)
             damage_side = "left" if damage_location[0] < 13 else "right"
             if damage_location[0] < 13:
@@ -197,11 +220,14 @@ class AlgoStrategy(gamelib.AlgoCore):
             game_state.attempt_upgrade(self.factory_extra_locations["loc"])
 
         for struct in self.build_queue:
-            game_state.attempt_spawn(struct["type"], struct["loc"])
             game_state.attempt_upgrade(struct["loc"])
+            game_state.attempt_spawn(struct["type"], struct["loc"])
 
         #game_state.attempt_upgrade(self.turret_base_locations["loc"])
         game_state.attempt_upgrade(self.factory_base_locations["loc"])
+        if game_state.turn_number > 12:
+            game_state.attempt_upgrade(self.late_game_turrets["loc"])
+            game_state.attempt_spawn(TURRET, self.late_game_turrets["loc"])
 
     def find_intercept_path(self, instance):
         # 5,8: 29 spaces
