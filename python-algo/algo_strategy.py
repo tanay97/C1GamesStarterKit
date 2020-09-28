@@ -81,6 +81,7 @@ class AlgoStrategy(gamelib.AlgoCore):
 
         self.frame_count = 0
         self.enemy_unit_movement = []
+        self.scored_on_locations = {}
 
 
     """
@@ -89,10 +90,13 @@ class AlgoStrategy(gamelib.AlgoCore):
     """
     def initialize_queues(self):
         self.factory_base_locations = { "type": FACTORY, 
-                                        "loc": [[11, 7], [12, 7], [13, 7], [14, 7], [15, 7], [16, 7], [12, 6]]
+                                        "loc": [[11, 7], [12, 7], [13, 7]]
                                         }
         self.factory_extra_locations = { "type": FACTORY,
-                                        "loc": [[13, 6], [14, 6], [15, 6], [13, 5], [14, 5]]
+                                        "loc": [[14, 7], [15, 7], [16, 7], [12, 6], [13, 6], [14, 6], [15, 6], 
+                                        [13, 5], [14, 5], [9, 7], [10, 7],
+                                        [17, 7], [18, 7], [10, 6], [11, 6], [16, 6], [17, 6], [11, 5], [12, 5], 
+                                        [15, 5], [16, 5], [12, 4], [13, 4], [14, 4], [15, 4], [13, 3], [14, 3]]
                                          }
         # V-shape wall setup
         self.wall_left_location = { "type": WALL,
@@ -116,7 +120,7 @@ class AlgoStrategy(gamelib.AlgoCore):
         self.turret_left_locations = { "type": TURRET,
                                     "loc": [[3, 12], [4, 11], [5, 12], [5, 10]]
                                     }
-        self.base_build = [self.wall_left_location, self.wall_base_location, self.turret_base_locations, self.factory_base_locations]
+        self.base_build = [self.factory_base_locations]
         self.build_queue = []
 
     def starter_strategy(self, game_state):
@@ -128,30 +132,28 @@ class AlgoStrategy(gamelib.AlgoCore):
         """
 
         self.build_defences(game_state)
+        self.attack_strategy(game_state)
 
             # self.scout_attack(game_state, int(0.5*game_state.get_resource(MP)))
     
     def attack_strategy(self, game_state):
-        if game_state.turn_number < 3:
-            interceptor_ratio = 0.8
+        if game_state.turn_number < 10:
+            interceptor_ratio = 1
             demolisher_ratio = 0
-            scout_ratio = 0.2
-        elif game_state.turn_number < 10:
-            interceptor_ratio = 0.5
-            demolisher_ratio = 0.2
-            scout_ratio = 0.3
-        elif game_state.turn_number < 20:
-            interceptor_ratio = 0.3
-            demolisher_ratio = 0.5
-            scout_ratio = 0.2
+            scout_ratio = 0
         else:
-            interceptor_ratio = 0.1
-            demolisher_ratio = 0.7
-            scout_ratio = 0.2
-
-        self.stall_with_interceptors(game_state, int(interceptor_ratio*game_state.get_resource(MP)))
-        #self.demolisher_attack(game_state, int(demolisher_ratio*game_state.number_affordable(DEMOLISHER)))
-        self.scout_attack(game_state, int(scout_ratio*game_state.number_affordable(SCOUT)))
+            interceptor_ratio = 0.3
+            # demolisher_ratio = 0.7
+            scout_ratio = 0.7
+        if game_state.turn_number < 3:
+            game_state.attempt_spawn(INTERCEPTOR, [7, 6], int(game_state.number_affordable(INTERCEPTOR)*interceptor_ratio/2))
+            game_state.attempt_spawn(INTERCEPTOR, [20, 6], int(game_state.number_affordable(INTERCEPTOR)*interceptor_ratio/2))
+        else:
+            self.stall_with_interceptors(game_state, int(interceptor_ratio*game_state.get_resource(MP)))
+            # self.demolisher_attack(game_state, int(demolisher_ratio*game_state.number_affordable(DEMOLISHER)))
+            self.scout_attack(game_state, int(scout_ratio*game_state.number_affordable(SCOUT)))
+        if game_state.turn_number > 20:
+            game_state.attempt_spawn(DEMOLISHER, [16, 2], game_state.number_affordable(DEMOLISHER))
 
     def build_defences(self, game_state):
         """
@@ -160,13 +162,24 @@ class AlgoStrategy(gamelib.AlgoCore):
         """
         # Useful tool for setting up your base locations: https://www.kevinbai.design/terminal-map-maker
         # More community tools available at: https://terminal.c1games.com/rules#Download
-        if game_state.turn_number == 3:
+        if game_state.turn_number == 0:
+            game_state.attempt_spawn(FACTORY, self.factory_base_locations["loc"])
+            game_state.attempt_upgrade(self.factory_base_locations["loc"])
+            return
+        if game_state.turn_number == 1:
+            self.base_build = [self.turret_base_locations, self.factory_base_locations]
+        if game_state.turn_number == 2:
+            self.base_build = [self.wall_base_location, self.wall_left_location, self.factory_base_locations]
+        if game_state.turn_number == 5:
+            self.base_build = [self.wall_left_location, self.wall_base_location, self.turret_base_locations, self.factory_base_locations]
             self.build_queue.append(self.factory_extra_locations)
+        if game_state.turn_number == 15:
+            self.base_build.append(self.turret_right_locations)
 
         for struct in self.base_build:
             game_state.attempt_spawn(struct["type"], struct["loc"])
 
-        if self.scored_on_locations:
+        if self.scored_on_locations and game_state.turn_number > 10:
             damage_location = max(self.scored_on_locations, key=self.scored_on_locations.get)
             damage_side = "left" if damage_location[0] < 13 else "right"
             if damage_location[0] < 13:
@@ -179,13 +192,15 @@ class AlgoStrategy(gamelib.AlgoCore):
                 self.build_queue.append(self.factory_extra_locations)
         else:
             self.build_queue.clear()
+            self.build_queue.append(self.factory_base_locations)
             self.build_queue.append(self.factory_extra_locations)
+            game_state.attempt_upgrade(self.factory_extra_locations["loc"])
 
         for struct in self.build_queue:
             game_state.attempt_spawn(struct["type"], struct["loc"])
             game_state.attempt_upgrade(struct["loc"])
 
-        game_state.attempt_upgrade(self.turret_base_locations["loc"])
+        #game_state.attempt_upgrade(self.turret_base_locations["loc"])
         game_state.attempt_upgrade(self.factory_base_locations["loc"])
 
     def find_intercept_path(self, instance):
@@ -211,15 +226,22 @@ class AlgoStrategy(gamelib.AlgoCore):
             return [26 - int(instance[0]/8), 12 - int(instance[0]/8)]
 
     def scout_attack(self, game_state, num):
+        if num == 0:
+            return
         loc, damage = self.least_damage_spawn_location(game_state, [[13, 0], [13, 1], [11, 2], [12, 1], [26, 12]])
-        if damage/(num * 15) < 0.5:
+        if damage == 0:
+            game_state.attempt_spawn(SCOUT, [loc], game_state.number_affordable(SCOUT))
+        if damage/(num * 15) < 0.9:
             game_state.attempt_spawn(SCOUT, [loc], num)
 
 
-    def demolisher_attack(self, game_state, cost):
+    def demolisher_attack(self, game_state, num):
         loc, damage = self.least_damage_spawn_location(game_state, [[26, 12]])
-        if self.damage_dealt(game_state, DEMOLISHER, 5, num) / damage > 3:
-            game_state.attempt_spawn(DEMOLISHER, [loc], cost/game_state.type_cost(DEMOLISHER))
+        if damage == 0:
+            game_state.attempt_spawn(DEMOLISHER, [loc], num)
+            return
+        if self.damage_dealt(game_state, loc, DEMOLISHER, num) / damage > 3:
+            game_state.attempt_spawn(DEMOLISHER, [loc], num)
 
     def stall_with_interceptors(self, game_state, cost):
         """
@@ -266,8 +288,22 @@ class AlgoStrategy(gamelib.AlgoCore):
         # Now just return the location that takes the least damage
         return location_options[damages.index(min(damages))], min(damages)
 
-    def damage_dealt(self, game_state, unit, health, num):
-        pass
+    def damage_dealt(self, game_state, loc, unit, num):
+        path = game_state.find_path_to_edge(loc)
+        for unit_info in game_state.config["unitInformation"]:
+            if unit_info["shorthand"] == unit:
+                damage = unit_info["attackDamageTower"]
+                health = unit_info["startHealth"]
+                rng = unit_info["attackRange"]
+
+        total_damage = 0
+        for location in path:
+            for attack_loc in game_state.game_map.get_locations_in_range(location, rng):
+                for unit in game_state.game_map[attack_loc]:
+                    if unit.player_index == 1:
+                        total_damage += damage*num
+            
+        return total_damage
 
     def on_action_frame(self, turn_string):
         """
@@ -302,3 +338,4 @@ class AlgoStrategy(gamelib.AlgoCore):
 if __name__ == "__main__":
     algo = AlgoStrategy()
     algo.start()
+
